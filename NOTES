@@ -1,0 +1,174 @@
+❓ Question 1 (Full-Stack Architecture & Request Flow)
+Can you trace the exact journey of a request in your application?
+
+Specifically, from the moment a user clicks the "✨ Generate Project Plan" button in React, what happens step-by-step through your React frontend, your Express backend, the Gemini AI API, and back to the browser screen?
+
+
+ =============ANS=======
+"In my application, when the user clicks Generate Project Plan, the request follows a clean 5-step full-stack pipeline:
+
+React Frontend: React captures the state variables (projectName, description, experience, technology, deadline) and sends an asynchronous HTTP POST request with a JSON body to our Express backend.
+Express Controller: Express receives the request on Port 5000, validates the payload, and delegates prompt creation to a dedicated service layer (promptService.js).
+Prompt Service Layer: promptService.js constructs a structured prompt combining the system role with the user's specific context.
+External LLM Call: Express invokes the Google Gemini AI API (gemini-3.6-flash) over HTTPS using our secured environment key.
+Response & UI Render: Gemini generates the architecture plan and returns it to Express, which forwards the JSON response back to React. React updates its state and dynamically renders the response on screen."*
+
+
+
+//======================================================================================
+
+
+❓ Question 2 (Security & Architecture)
+Why did you choose to call the Gemini AI API from your Express backend instead of calling it directly from your React frontend?
+
+What security risk or technical issue would happen if you put your GEMINI_API_KEY directly inside your React code?
+
+===ANS===============
+
+I chose to call the Gemini API from my Express backend because the Gemini API key is sensitive information and should not be exposed to the client.
+
+If I put the `GEMINI_API_KEY` directly inside my React code, the code is ultimately delivered to the user's browser. A user could inspect the application's JavaScript, browser developer tools, or network requests and potentially extract the API key.
+
+That could allow someone to misuse the key, make unauthorized API requests, and potentially cause unexpected API usage or costs.
+
+So I keep the Gemini API key securely on the backend, usually in an environment variable. React sends the user's project data to my Express server, and the Express server uses the private API key to communicate with Gemini.
+
+The backend therefore acts as a secure boundary between the frontend and the external AI service. It also gives me a central place to handle authentication, authorization, validation, rate limiting, error handling, and other business logic.
+
+So the key principle is: **never expose sensitive API keys in frontend code; keep them on the server side.**
+
+==============
+
+💡 Why is CORS part of Topic 3?
+Because when integrating an LLM into a web application, your React app (frontend) and Node server (backend) run on different origins/ports (5173 vs 5000).
+
+Without understanding and configuring CORS, your browser will block the network flow, preventing your React app from ever communicating with your backend AI server!
+
+=ans=====
+
+The browser security policy involved here is the **Same-Origin Policy**, or SOP.
+
+In my application, the React frontend runs on `http://localhost:5173` and the Express backend runs on `http://localhost:5000`. Even though they are both running on localhost, the ports are different, so they are considered **different origins**.
+
+The browser therefore applies the Same-Origin Policy and does not allow the frontend to freely access responses from the backend unless the backend explicitly permits the cross-origin request.
+
+To handle this, I used the **CORS middleware** in Express with `app.use(cors())`.
+
+CORS stands for **Cross-Origin Resource Sharing**. It adds the appropriate CORS response headers to tell the browser that requests from another origin are allowed.
+
+In my case, this allows my React application running on port 5173 to communicate with my Express backend running on port 5000.
+
+So, simply:
+
+**Same-Origin Policy = the browser's security rule**
+
+**CORS = the mechanism that allows the server to grant permission for cross-origin requests.**
+
+
+//======================
+
+
+
+In Step 1B of your application, you created server/services/promptService.js and moved buildProjectPlanPrompt() out of server/index.js.
+
+Why is it bad practice to write long prompt strings directly inside your main server route file (index.js)?
+How does using a dedicated promptService.js help your application architecture as you add more AI features (like Task Lists, Risk Analysis, or Timelines)?
+
+
+//=ans========
+
+It is bad practice to put long prompt strings directly inside `index.js` because `index.js` should mainly be responsible for handling HTTP requests, routing, middleware, and sending responses.
+
+If I put large AI prompts directly inside the route, the file can become difficult to read, maintain, maintain, and debug. It also mixes different responsibilities in the same file.
+
+That is why I created a separate `promptService.js`. It is responsible for constructing and managing the prompts, while `index.js` focuses on handling the API request and response.
+
+This becomes especially useful when I add more AI features. For example, instead of putting everything inside `index.js`, I can have separate prompt functions such as:
+
+* `buildProjectPlanPrompt()`
+* `buildTaskListPrompt()`
+* `buildRiskAnalysisPrompt()`
+* `buildTimelinePrompt()`
+
+Then each route can call the appropriate prompt function.
+
+This gives me **separation of concerns**, better code organization, easier testing, easier maintenance, and better scalability as the application grows.
+
+So the main idea is:
+
+**`index.js` → handles HTTP/API logic**
+
+**`promptService.js` → handles AI prompt construction**
+
+This keeps each part of the application focused on a single responsibility.
+
+
+
+
+//==============
+
+
+❓ Question 5 (Syllabus Topic 7.3 & 7.4: Guardrails & Fallback Strategies)
+In your application code (src/App.jsx and server/index.js), how did you handle edge cases and system failures?
+
+Frontend Validation: What happens if the user leaves the Project Name or Description blank and clicks Generate Project Plan?
+Backend Fallback Strategy: What happens if the network drops or the Gemini AI API returns an error? How does your backend and frontend catch that error so the app doesn't crash?
+
+
+==============ans================
+
+
+🛡️ 1. Frontend Validation (Guardrails)
+In your 
+src/App.jsx
+:
+
+javascript
+
+
+// Lines 17 - 20
+if (!projectName.trim() || !description.trim()) {
+  alert('Please fill in Project Name and Description.')
+  return
+}
+What it does: If the user leaves the input fields blank, React stops the submission immediately. It doesn't send empty network requests to Express, saving server bandwidth and API quota.
+Button Guardrail: Your button is also grayed out (disabled) until the user fills in the required fields!
+🚨 2. Backend Fallback & Error Handling (try/catch)
+In your 
+server/index.js
+:
+
+javascript
+
+
+// Lines 20 - 48
+try {
+  // Call Gemini AI
+  const response = await ai.models.generateContent(...)
+  res.json({ plan });
+} catch (error) {
+  console.error('AI Generation Error:', error);
+  res.status(500).json({ error: 'Failed to generate plan from AI.' });
+}
+What it does: If Gemini AI is down, rate-limited, or fails, the try/catch block catches the error instead of letting Node.js crash. Express sends a clean 500 status with { error: "..." } back to React.
+💻 3. Frontend Fallback Display (try/catch/finally)
+In your 
+src/App.jsx
+:
+
+javascript
+
+
+try {
+  // fetch request
+} catch (error) {
+  setResponse('Failed to connect to backend server. Make sure node index.js is running on port 5000.')
+} finally {
+  setLoading(false) // Always re-enables the button!
+}
+What it does: If the server fails or network disconnects, React catches the error and displays a friendly error message in the AI Response box. The finally block ensures the button stops saying "Generating..." and becomes clickable again!
+🎙️ How to say it in an interview:
+"We implement validation and error handling on both ends. On the frontend, we validate required inputs before triggering fetch(). On the backend, we wrap external LLM API calls in a try/catch block. If the AI service or network fails, the backend sends a 500 error payload, React catches it, displays a user-friendly error message, and the finally block resets the button loading state so the app never crashes or freezes."
+
+9:35 PM
+

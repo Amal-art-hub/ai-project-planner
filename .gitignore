@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ⚠️ SECRET ENVIRONMENT KEYS (MUST NEVER BE COMMITTED TO GIT)
+.env
+*.env
+server/.env
+server/*.env
+
+# Dependencies
+server/node_modules

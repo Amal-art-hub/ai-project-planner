@@ -1,0 +1,325 @@
+Step 1C — Create your System Prompt
+
+Your planner needs a stable instruction.
+
+Something like:
+
+You are an experienced software project planning assistant.
+
+Your job is to analyze a user's project idea and create a
+realistic development plan.
+
+Consider:
+- project complexity
+- user's experience
+- technology stack
+- deadline
+
+Break the project into practical development phases and tasks.
+
+Do not assume that an unrealistic deadline is achievable.
+Identify risks when appropriate.
+
+Return the result in the required structured format.
+
+Notice what we have now:
+
+SYSTEM
+   ↓
+Defines AI behavior
+
+This directly demonstrates:
+
+Topic 2.1 — System prompt
+Step 1D — Add Context
+
+Then dynamically add:
+
+PROJECT CONTEXT
+
+Project Name:
+${projectName}
+
+Description:
+${description}
+
+Experience:
+${experience}
+
+Technology:
+${technology}
+
+Deadline:
+${deadline} days
+
+This is context injection.
+
+The prompt becomes conceptually:
+
+SYSTEM
+You are an experienced project planner...
+
+CONTEXT
+Project: Shoe E-commerce
+Experience: Beginner
+Stack: MERN
+Deadline: 30 days
+
+USER
+Create a project plan for this project.
+
+Now you can tell your reviewer:
+
+"I separate the system instructions from dynamic project context and the user's request. The backend constructs this prompt before sending it to the LLM."
+
+That's a much stronger answer than simply saying:
+
+"I send the prompt to Gemini."
+
+Step 1E — Make the AI return structured JSON
+
+This is the next major improvement.
+
+Instead of Gemini returning:
+
+First create the database...
+
+Then create the backend...
+
+Then build the frontend...
+
+we want:
+
+{
+  "projectOverview": "...",
+  "complexity": "medium",
+  "phases": [
+    {
+      "name": "Planning",
+      "tasks": [
+        {
+          "title": "Define requirements",
+          "estimatedDays": 1
+        }
+      ]
+    }
+  ],
+  "risks": [],
+  "testingPlan": []
+}
+
+Why?
+
+Because your React application can now render:
+
+PROJECT OVERVIEW
+
+COMPLEXITY
+Medium
+
+PHASE 1
+Planning
+
+☐ Define requirements
+☐ Design database
+
+PHASE 2
+Backend
+
+☐ Create Express server
+☐ Create APIs
+
+RISKS
+⚠ Payment integration may require additional time.
+
+TESTING
+☐ API testing
+☐ UI testing
+
+This covers:
+
+Topic 2.3 — Consistent outputs
+
+and:
+
+Topic 3.4 — Structuring responses for UI.
+Step 1F — Validate the AI response
+
+This is where we stop trusting Gemini blindly.
+
+Your backend should do:
+
+Gemini
+   ↓
+Response
+   ↓
+Is it valid?
+   │
+   ├── YES → React
+   │
+   └── NO → Retry / fallback
+
+For example:
+
+if (
+  !response.projectOverview ||
+  !response.phases ||
+  !Array.isArray(response.phases)
+) {
+   // invalid AI response
+}
+
+Later we'll make this much cleaner with a schema validator.
+
+This covers:
+
+Topic 7.2 — Validate outputs
+
+and starts your:
+
+Topic 9 — Testing mindset.
+Then comes the BIG feature
+
+Once the above is working, we will change your single AI call into:
+
+                    USER
+                     │
+                     ▼
+              Project Details
+                     │
+                     ▼
+              Analyze Project
+                     │
+                     ▼
+             Generate Phases
+                     │
+                     ▼
+              Generate Tasks
+                     │
+                     ▼
+             Estimate Timeline
+                     │
+                     ▼
+              Identify Risks
+                     │
+                     ▼
+             Testing Checklist
+                     │
+                     ▼
+                VALIDATE
+                     │
+                     ▼
+              PROJECT PLAN
+
+That will be your multi-step AI workflow.
+
+Then we'll add the AI Assistant
+
+Your final UI will have something like:
+
+┌──────────────────────────────────────────────┐
+│             AI PROJECT PLANNER               │
+├──────────────────────────────────────────────┤
+│                                              │
+│  Project: Shoe E-commerce                    │
+│  Progress: 35%                               │
+│                                              │
+│  ───────── PROJECT PLAN ─────────             │
+│                                              │
+│  📋 Tasks                                    │
+│  📅 Timeline                                 │
+│  ⚠️ Risks                                    │
+│  🧪 Testing                                  │
+│                                              │
+│  ──────── AI ASSISTANT ────────              │
+│                                              │
+│  Ask: [ What should I do next? ]             │
+│                                              │
+│             [ Ask AI ]                       │
+│                                              │
+└──────────────────────────────────────────────┘
+
+Then the assistant receives:
+
+System Prompt
++
+Project Context
++
+Current Plan
++
+Conversation History
++
+User Question
+
+Now you've covered context injection + memory in a meaningful way.
+
+And after that
+
+We'll add these small but real pieces:
+
+Agent/tool
+AI
+ ↓
+calculateTimeline()
+ ↓
+Result
+ ↓
+AI
+AI search
+"Show security tasks"
+        ↓
+AI
+        ↓
+Relevant project tasks
+Implementation guide
+"How do I implement JWT authentication?"
+        ↓
+AI
+        ↓
+Implementation steps/code
+Fallback
+Gemini unavailable
+       ↓
+Retry
+       ↓
+Fallback project template
+Caching
+Same request?
+     ↓
+Cache → return
+Optimization
+Only send relevant context
++
+short reusable prompts
+Evaluation
+Test Cases
+    ↓
+AI Output
+    ↓
+Validation
+    ↓
+Pass / Fail
+So what should you do RIGHT NOW?
+
+Don't add another feature yet.
+
+Your next task is:
+
+Convert your current raw Gemini prompt into a structured prompt system.
+
+Specifically:
+
+1. Add projectName
+2. Add experience
+3. Add technology
+4. Add deadline
+5. Create promptService.js
+6. Separate SYSTEM / CONTEXT / USER
+7. Ask Gemini for structured JSON
+8. Return that JSON to React
+9. Render the JSON properly
+10. Add basic output validation
+
+Once that's working, stop and show me your current server/index.js and src/App.jsx.
+
+I'll then help you modify your actual code, rather than giving you a completely different project. That way we preserve what you've already built and move forward quickly.
