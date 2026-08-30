@@ -12,6 +12,16 @@ function App() {
   const [response, setResponse] = useState('')
   const [loading, setLoading] = useState(false)
 
+
+  // AI Assistant states
+const [question, setQuestion] = useState('')
+const [conversationHistory, setConversationHistory] = useState([])
+const [assistantLoading, setAssistantLoading] = useState(false)
+
+
+
+const [plan, setPlan] = useState(null)
+
   // 2. HANDLE GENERATE PLAN
   const handleGeneratePlan = async () => {
     if (!projectName.trim() || !description.trim()) {
@@ -41,7 +51,9 @@ function App() {
       const data = await res.json()
 
       if (res.ok) {
-        setResponse(data.plan)
+
+         setPlan(data.plan)   
+        setResponse(JSON.stringify(data.plan, null, 2))
       } else {
         setResponse(`Error: ${data.error}`)
       }
@@ -51,6 +63,51 @@ function App() {
       setLoading(false)
     }
   }
+
+
+
+// 3. HANDLE AI ASSISTANT
+const handleAskAssistant = async () => {
+  if (!question.trim() || !response) return
+
+  const currentPlan = JSON.parse(response)
+
+  setAssistantLoading(true)
+
+  try {
+    const res = await fetch('http://localhost:5000/api/project/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question,
+        projectContext: { projectName, technology, experience, deadline },
+        currentPlan,
+        conversationHistory,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (res.ok) {
+      // Add user question and AI answer to conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', text: question },
+        { role: 'assistant', text: data.answer },
+      ])
+      setQuestion('')
+    }
+  } catch (error) {
+    console.error('Assistant error:', error)
+  } finally {
+    setAssistantLoading(false)
+  }
+}
+
+
+
+
+
 
   // Common input field style
   const inputStyle = {
@@ -192,25 +249,145 @@ function App() {
           {loading ? 'Generating Custom Plan...' : '✨ Generate Project Plan'}
         </button>
 
-        {/* AI Response Area */}
-        <div style={{ marginTop: '28px' }}>
-          <h3 style={{ fontSize: '15px', color: '#94a3b8', marginBottom: '10px' }}>
-            AI Response:
-          </h3>
-          <div style={{
-            backgroundColor: '#0f172a',
-            border: '1px solid #334155',
-            borderRadius: '10px',
-            padding: '16px',
-            minHeight: '100px',
-            color: '#e2e8f0',
-            fontSize: '14px',
-            whiteSpace: 'pre-wrap',
-            fontFamily: 'monospace'
-          }}>
-            {response || (loading ? 'Analyzing your project requirements & skill level...' : 'Fill out the form above and click "Generate Project Plan".')}
+
+
+        
+
+{/* PROJECT PLAN DISPLAY */}
+{plan && (
+  <div style={{ marginTop: '28px' }}>
+
+    {/* Overview */}
+    <h3 style={{ color: '#818cf8', fontSize: '14px', marginBottom: '6px' }}>📋 PROJECT OVERVIEW</h3>
+    <p style={{ color: '#e2e8f0', fontSize: '14px', marginBottom: '16px', lineHeight: '1.6' }}>
+      {plan.projectOverview}
+    </p>
+
+    {/* Complexity & Days */}
+    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+      <span style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '8px 14px', color: '#f8fafc', fontSize: '13px' }}>
+        🎯 Complexity: <strong>{plan.complexity}</strong>
+      </span>
+      <span style={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '8px 14px', color: '#f8fafc', fontSize: '13px' }}>
+        📅 Estimated: <strong>{plan.estimatedTotalDays} days</strong>
+      </span>
+    </div>
+
+    {/* Phases */}
+    <h3 style={{ color: '#818cf8', fontSize: '14px', marginBottom: '10px' }}>🚀 DEVELOPMENT PHASES</h3>
+    {plan.phases.map((phase, i) => (
+      <div key={i} style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '14px', marginBottom: '12px' }}>
+        <h4 style={{ color: '#c084fc', fontSize: '13px', margin: '0 0 10px 0' }}>{phase.name}</h4>
+        {phase.tasks.map((task, j) => (
+          <div key={j} style={{ display: 'flex', justifyContent: 'space-between', color: '#e2e8f0', fontSize: '13px', marginBottom: '6px' }}>
+            <span>☐ {task.title}</span>
+            <span style={{ color: '#94a3b8', whiteSpace: 'nowrap', marginLeft: '12px' }}>{task.estimatedDays}d</span>
           </div>
-        </div>
+        ))}
+      </div>
+    ))}
+
+    {/* Risks */}
+    <h3 style={{ color: '#818cf8', fontSize: '14px', margin: '20px 0 10px 0' }}>⚠️ RISKS</h3>
+    <div style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '14px' }}>
+      {plan.risks.map((risk, i) => (
+        <p key={i} style={{ color: '#fbbf24', fontSize: '13px', margin: '0 0 6px 0' }}>• {risk}</p>
+      ))}
+    </div>
+
+    {/* Testing Plan */}
+    <h3 style={{ color: '#818cf8', fontSize: '14px', margin: '20px 0 10px 0' }}>🧪 TESTING PLAN</h3>
+    <div style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '14px' }}>
+      {plan.testingPlan.map((test, i) => (
+        <p key={i} style={{ color: '#86efac', fontSize: '13px', margin: '0 0 6px 0' }}>☐ {test}</p>
+      ))}
+    </div>
+
+  </div>
+)}
+
+
+
+
+
+{/* AI ASSISTANT SECTION - only show after plan is generated */}
+{response && (
+  <div style={{ marginTop: '28px' }}>
+    <h3 style={{ fontSize: '15px', color: '#94a3b8', marginBottom: '10px' }}>
+      🤖 AI Assistant
+    </h3>
+
+    {/* Conversation History */}
+    {conversationHistory.length > 0 && (
+      <div style={{
+        backgroundColor: '#0f172a',
+        border: '1px solid #334155',
+        borderRadius: '10px',
+        padding: '12px',
+        marginBottom: '12px',
+        maxHeight: '250px',
+        overflowY: 'auto'
+      }}>
+        {conversationHistory.map((msg, index) => (
+          <div key={index} style={{
+            marginBottom: '10px',
+            textAlign: msg.role === 'user' ? 'right' : 'left'
+          }}>
+            <span style={{
+              display: 'inline-block',
+              backgroundColor: msg.role === 'user' ? '#6366f1' : '#1e293b',
+              border: msg.role === 'assistant' ? '1px solid #334155' : 'none',
+              color: '#f8fafc',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              fontSize: '13px',
+              maxWidth: '85%',
+              textAlign: 'left'
+            }}>
+              <strong>{msg.role === 'user' ? 'You' : '🤖 Assistant'}:</strong>
+              <br />
+              {msg.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* Question Input */}
+    <input
+      type="text"
+      value={question}
+      onChange={(e) => setQuestion(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && handleAskAssistant()}
+      placeholder="Ask: What should I do first? How do I handle auth?"
+      style={inputStyle}
+    />
+
+    {/* Ask Button */}
+    <button
+      onClick={handleAskAssistant}
+      disabled={assistantLoading || !question.trim()}
+      style={{
+        width: '100%',
+        padding: '12px',
+        fontSize: '15px',
+        fontWeight: '600',
+        color: '#ffffff',
+        background: question.trim() ? 'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)' : '#334155',
+        border: 'none',
+        borderRadius: '10px',
+        cursor: question.trim() ? 'pointer' : 'not-allowed',
+        marginTop: '4px'
+      }}
+    >
+      {assistantLoading ? 'Thinking...' : '💬 Ask AI Assistant'}
+    </button>
+  </div>
+)}
+
+
+
+
       </div>
     </div>
   )

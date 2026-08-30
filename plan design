@@ -323,3 +323,134 @@ Specifically:
 Once that's working, stop and show me your current server/index.js and src/App.jsx.
 
 I'll then help you modify your actual code, rather than giving you a completely different project. That way we preserve what you've already built and move forward quickly.
+
+
+
+topic
+=========
+
+1. Understand How AI Systems Actually Work Internally 1. Flow of a request: 1. User input → system processing → LLM → response 2. Internal prompt wrapping: 1. System prompt 2. User prompt 3. Hidden instructions 3. How tools structure prompts before sending to the LLM 4. Context injection and conversation memory 2. Design Prompts at Application Level 1. Difference between: 1. User prompts 2. System prompts 2. Designing prompt templates 3. Structuring prompts for consistent outputs 4. Multi-step prompt pipelines 3. Integrate LLMs into Web Applications 1. Basic flow: 1. Frontend → Backend → LLM → Response 2. Handling API-based AI integration 3. Managing input/output flow 4. Structuring responses for UI 4. Build AI-Powered Application Features 1. Text generation 2. Smart input / auto-complete 3. AI-assisted search 4. Content/code generation 5. Automate Workflows Using AI (Agentic Thinking) 1. Break tasks into multi-step AI workflows 2. Chain prompts across steps 3. Introduce agent-like systems (AI + tools) 4. Understand tool usage (agent skills concept) 6. Understand Agentic Systems (Intro Level) 1. What is agentic workflow vs normal prompting 2. Basic idea of tool-connected AI systems 3. Introduction to MCP (Model Context Protocol – concept only) 4. How AI uses external tools/data to complete tasks 7. Handle Real-World AI Limitations 1. Hallucination in production 2. Validate outputs before usage 3. Add constraints and guardrails 4. Use fallback strategies 8. Optimize AI Usage in Applications 1. Reduce token usage 2. Improve prompt efficiency 3. Cost vs performance 4. Response caching 9. Validate AI Outputs Using a Testing Mindset 1. Do not trust AI outputs blindly 2. Validate results using logic or test cases 3. Identify incorrect or inconsistent outputs 10. Apply Through a Mini AI Feature 1. Design a feature using AI 2. Implement prompt flow 3. Integrate into UI 4. Validate outputs and handle failures 5. Improve through iterations
+
+
+
+
+
+
+
+
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
+
+const { GoogleGenAI } = require('@google/genai');
+const { SYSTEM_PROMPT, buildUserPrompt,validateProjectPlan, generateMultiStepPlan} = require('./services/promptService'); // 👈 Imported Prompt Service
+
+const app = express();
+const PORT = 5000;
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => {
+  res.send('AI Project Planner API is running!');
+});
+
+app.post('/api/project/plan', async (req, res) => {
+  try {
+    const { projectName, description, experience, technology, deadline } = req.body;
+
+    if (!description || !projectName) {
+      return res.status(400).json({ error: 'Project Name and Description are required.' });
+    }
+
+   console.log(Starting Multi-Step AI Workflow for "${projectName}"...);
+    // 👈 Call Multi-Step AI Pipeline (Chained 3-Step Calls)
+    const plan = await generateMultiStepPlan(ai, {
+      projectName,
+      description,
+      experience,
+      technology,
+      deadline
+    });
+
+       if (!validateProjectPlan(plan)) {
+      console.error('Invalid AI plan structure:', plan);
+      return res.status(502).json({ error: 'Received malformed plan from AI. Please try again.' });
+    }
+
+
+    res.json({ plan });
+
+  } catch (error) {
+    console.error('AI Generation Error:', error);
+    res.status(500).json({ error: 'Failed to generate plan from AI.' });
+  }
+});
+
+
+
+
+
+
+app.post('/api/project/assistant', async (req, res) => {
+  try {
+    const { question, projectContext, currentPlan, conversationHistory } = req.body;
+
+    if (!question || !projectContext || !currentPlan) {
+      return res.status(400).json({ error: 'Question, project context and plan are required.' });
+    }
+
+    // Build conversation history as formatted text
+    let historyText = '';
+    if (conversationHistory && conversationHistory.length > 0) {
+      historyText = conversationHistory
+        .map(msg => ${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text})
+        .join('\n');
+    }
+
+    // Build the full assistant prompt
+    const assistantPrompt = PROJECT CONTEXT:
+Project Name: ${projectContext.projectName}
+Technology: ${projectContext.technology}
+Experience Level: ${projectContext.experience}
+Deadline: ${projectContext.deadline} days
+
+CURRENT PROJECT PLAN:
+${JSON.stringify(currentPlan, null, 2)}
+
+CONVERSATION HISTORY:
+${historyText || 'No previous conversation.'}
+
+USER QUESTION:
+${question};
+
+    const assistantSystemPrompt = You are a helpful AI project planning assistant. 
+The developer has already generated a project plan and is now asking follow-up questions.
+Use the project context, current plan, and conversation history to give specific, practical answers.
+Keep answers concise and actionable.;
+
+    const response = await ai.models.generateContent({
+      model:  'gemini-3.6-flash',
+      contents: assistantPrompt,
+      config: {
+        systemInstruction: assistantSystemPrompt,
+      },
+    });
+
+    res.json({ answer: response.text });
+
+  } catch (error) {
+    console.error('Assistant Error:', error);
+    res.status(500).json({ error: 'Failed to get assistant response.' });
+  }
+});
+
+this is server/index.js 
+
+
+=============
+
+
+/** * System prompt defining AI persona, instructions, and behavior rules. */ const SYSTEM_PROMPT = You are an experienced software project planning assistant. Your job is to analyze a user's project idea and create a realistic development plan. Consider: - project complexity - user's experience - technology stack - deadline Break the project into practical development phases and tasks. Do not assume that an unrealistic deadline is achievable. Identify risks when appropriate. Return your response strictly as a JSON object matching this exact schema: { "projectOverview": "Brief summary of the project goals and scope", "complexity": "Low | Medium | High", "estimatedTotalDays": 14, "phases": [ { "name": "Phase Name (e.g. Phase 1: Planning & Setup)", "tasks": [ { "title": "Task title", "estimatedDays": 2 } ] } ], "risks": [ "Potential risk or bottleneck description" ], "testingPlan": [ "Key testing step or requirement" ] }; /** * Constructs the user prompt containing dynamic project input data. */ function buildUserPrompt({ projectName, description, experience, technology, deadline }) { return PROJECT CONTEXT Project Name: ${projectName} Description: ${description} Experience Level: ${experience} Technology Stack: ${technology} Deadline: ${deadline} days TASK: Create a realistic, step-by-step development plan based on the project context above.; } /** * Validates the structure of the AI-generated project plan. * Returns true if valid, false otherwise. */ function validateProjectPlan(plan) { if (!plan || typeof plan !== 'object') { return false; } // Check required top-level fields if (!plan.projectOverview || typeof plan.projectOverview !== 'string') { return false; } if (!plan.complexity || typeof plan.complexity !== 'string') { return false; } // Check that phases exists, is an Array, and is not empty if (!plan.phases || !Array.isArray(plan.phases) || plan.phases.length === 0) { return false; } return true; } /** * MULTI-STEP AI WORKFLOW PIPELINE PROMPTS & FUNCTION */ // 1. Analysis Step Prompt const ANALYSIS_SYSTEM_PROMPT = You are a senior software architect. Analyze the project details and return a JSON object with: { "projectOverview": "Detailed summary of the project scope and architecture", "complexity": "Low | Medium | High" }; // 2. Phases & Tasks Step Prompt const PHASES_SYSTEM_PROMPT = You are a technical project manager. Based on the project overview, create realistic development phases and breakdown tasks for each phase. Return JSON: { "estimatedTotalDays": 30, "phases": [ { "name": "Phase 1: Architecture & Setup", "tasks": [ { "title": "Setup repository & environment", "estimatedDays": 1 } ] } ] }; // 3. Risks & Testing Step Prompt const RISKS_TESTING_SYSTEM_PROMPT = You are a QA lead and risk management expert. Based on the development plan, identify project risks and a testing checklist. Return JSON: { "risks": ["Risk description 1", "Risk description 2"], "testingPlan": ["Testing requirement 1", "Testing requirement 2"] }; /** * Executes chained AI calls sequentially (Multi-Step AI Workflow). */ async function generateMultiStepPlan(ai, projectDetails) { const { projectName, description, experience, technology, deadline } = projectDetails; // STEP 1: Analyze Project Scope & Complexity console.log('Step 1/3: Analyzing project scope & complexity...'); const step1Response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents: Project Name: ${projectName}\nDescription: ${description}\nTech Stack: ${technology}\nDeadline: ${deadline} days, config: { systemInstruction: ANALYSIS_SYSTEM_PROMPT, responseMimeType: 'application/json', }, }); const step1Data = JSON.parse(step1Response.text); // STEP 2: Generate Development Phases, Tasks & Timelines console.log('Step 2/3: Generating development phases & tasks...'); const step2Response = await ai.models.generateContent({ model:'gemini-3.6-flash', contents: Overview: ${step1Data.projectOverview}\nComplexity: ${step1Data.complexity}\nDeveloper Experience: ${experience}\nTech Stack: ${technology}\nTarget Deadline: ${deadline} days, config: { systemInstruction: PHASES_SYSTEM_PROMPT, responseMimeType: 'application/json', }, }); const step2Data = JSON.parse(step2Response.text); // STEP 3: Identify Risks & Testing Checklist console.log('Step 3/3: Identifying risks & testing checklist...'); const step3Response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents: Project Overview: ${step1Data.projectOverview}\nPhases: ${JSON.stringify(step2Data.phases)}, config: { systemInstruction: RISKS_TESTING_SYSTEM_PROMPT, responseMimeType: 'application/json', }, }); const step3Data = JSON.parse(step3Response.text); // MERGE ALL STEPS INTO FINAL PLAN OBJECT const finalPlan = { projectOverview: step1Data.projectOverview, complexity: step1Data.complexity, estimatedTotalDays: step2Data.estimatedTotalDays || parseInt(deadline, 10) || 30, phases: step2Data.phases, risks: step3Data.risks, testingPlan: step3Data.testingPlan, }; return finalPlan; } module.exports = { SYSTEM_PROMPT, buildUserPrompt, validateProjectPlan, generateMultiStepPlan }; this is server/services/promtservices.js
