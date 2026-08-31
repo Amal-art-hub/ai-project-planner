@@ -1,69 +1,69 @@
-/**
- * System prompt defining AI persona, instructions, and behavior rules.
- */
-const SYSTEM_PROMPT = `You are an experienced software project planning assistant.
+// /**
+//  * System prompt defining AI persona, instructions, and behavior rules.
+//  */
+// const SYSTEM_PROMPT = `You are an experienced software project planning assistant.
 
-Your job is to analyze a user's project idea and create a realistic development plan.
+// Your job is to analyze a user's project idea and create a realistic development plan.
 
-Consider:
-- project complexity
-- user's experience
-- technology stack
-- deadline
+// Consider:
+// - project complexity
+// - user's experience
+// - technology stack
+// - deadline
 
-Break the project into practical development phases and tasks.
+// Break the project into practical development phases and tasks.
 
-Do not assume that an unrealistic deadline is achievable.
-Identify risks when appropriate.
+// Do not assume that an unrealistic deadline is achievable.
+// Identify risks when appropriate.
 
-Return your response strictly as a JSON object matching this exact schema:
-{
-  "projectOverview": "Brief summary of the project goals and scope",
-  "complexity": "Low | Medium | High",
-  "estimatedTotalDays": 14,
-  "phases": [
-    {
-      "name": "Phase Name (e.g. Phase 1: Planning & Setup)",
-      "tasks": [
-        {
-          "title": "Task title",
-          "estimatedDays": 2
-        }
-      ]
-    }
-  ],
-  "risks": [
-    "Potential risk or bottleneck description"
-  ],
-  "testingPlan": [
-    "Key testing step or requirement"
-  ]
-}`;
+// Return your response strictly as a JSON object matching this exact schema:
+// {
+//   "projectOverview": "Brief summary of the project goals and scope",
+//   "complexity": "Low | Medium | High",
+//   "estimatedTotalDays": 14,
+//   "phases": [
+//     {
+//       "name": "Phase Name (e.g. Phase 1: Planning & Setup)",
+//       "tasks": [
+//         {
+//           "title": "Task title",
+//           "estimatedDays": 2
+//         }
+//       ]
+//     }
+//   ],
+//   "risks": [
+//     "Potential risk or bottleneck description"
+//   ],
+//   "testingPlan": [
+//     "Key testing step or requirement"
+//   ]
+// }`;
 
-/**
- * Constructs the user prompt containing dynamic project input data.
- */
-function buildUserPrompt({ projectName, description, experience, technology, deadline }) {
-  return `PROJECT CONTEXT
+// /**
+//  * Constructs the user prompt containing dynamic project input data.
+//  */
+// function buildUserPrompt({ projectName, description, experience, technology, deadline }) {
+//   return `PROJECT CONTEXT
 
-Project Name:
-${projectName}
+// Project Name:
+// ${projectName}
 
-Description:
-${description}
+// Description:
+// ${description}
 
-Experience Level:
-${experience}
+// Experience Level:
+// ${experience}
 
-Technology Stack:
-${technology}
+// Technology Stack:
+// ${technology}
 
-Deadline:
-${deadline} days
+// Deadline:
+// ${deadline} days
 
-TASK:
-Create a realistic, step-by-step development plan based on the project context above.`;
-}
+// TASK:
+// Create a realistic, step-by-step development plan based on the project context above.`;
+// }
 
 
 
@@ -185,8 +185,7 @@ async function generateMultiStepPlan(ai, projectDetails) {
 
 
 module.exports = {
-  SYSTEM_PROMPT,
-  buildUserPrompt,
+
   validateProjectPlan,
   generateMultiStepPlan
 };

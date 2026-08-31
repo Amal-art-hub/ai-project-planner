@@ -1,9 +1,11 @@
+
+console.log("server is running")
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
 const { GoogleGenAI } = require('@google/genai');
-const { SYSTEM_PROMPT, buildUserPrompt,validateProjectPlan, generateMultiStepPlan} = require('./services/promptService'); // 👈 Imported Prompt Service
+const { validateProjectPlan, generateMultiStepPlan} = require('./services/promptService'); // 👈 Imported Prompt Service
 
 const app = express();
 const PORT = 5000;
@@ -16,6 +18,8 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.send('AI Project Planner API is running!');
 });
+
+
 
 app.post('/api/project/plan', async (req, res) => {
   try {
