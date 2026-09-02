@@ -67,40 +67,32 @@
 
 
 
-
-
-
-/**
- * Validates the structure of the AI-generated project plan.
- * Returns true if valid, false otherwise.
- */
 function validateProjectPlan(plan) {
   if (!plan || typeof plan !== 'object') {
     return false;
   }
-
+ 
   // Check required top-level fields
   if (!plan.projectOverview || typeof plan.projectOverview !== 'string') {
     return false;
   }
-
+ 
   if (!plan.complexity || typeof plan.complexity !== 'string') {
     return false;
   }
-
+ 
   // Check that phases exists, is an Array, and is not empty
   if (!plan.phases || !Array.isArray(plan.phases) || plan.phases.length === 0) {
     return false;
   }
-
+ 
   return true;
 }
-
-
-
-
-
-
+ 
+ 
+ 
+ 
+ 
 /**
  * MULTI-STEP AI WORKFLOW PIPELINE PROMPTS & FUNCTION
  */
@@ -108,8 +100,13 @@ function validateProjectPlan(plan) {
 const ANALYSIS_SYSTEM_PROMPT = `You are a senior software architect. Analyze the project details and return a JSON object with:
 {
   "projectOverview": "Detailed summary of the project scope and architecture",
-  "complexity": "Low | Medium | High"
-}`;
+  "complexity": "Low | Medium | High",
+  "deadlineFeasible": true,
+  "suggestedDays": 30
+ 
+ 
+}
+Evaluate if the provided deadline is realistic for this project complexity. Set deadlineFeasible to false and provide suggestedDays if the deadline is too short.`;
 // 2. Phases & Tasks Step Prompt
 const PHASES_SYSTEM_PROMPT = `You are a technical project manager. Based on the project overview, create realistic development phases and breakdown tasks for each phase. Return JSON:
 {
@@ -129,44 +126,78 @@ const RISKS_TESTING_SYSTEM_PROMPT = `You are a QA lead and risk management exper
   "risks": ["Risk description 1", "Risk description 2"],
   "testingPlan": ["Testing requirement 1", "Testing requirement 2"]
 }`;
+ 
+/**
+ * Wrapper function for AI calls with retry logic
+ */
+async function callAIWithRetry(ai, model, contents, config, maxRetries = 3) {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      return await ai.models.generateContent({
+        model: model,
+        contents: contents,
+        config: config,
+      });
+    } catch (error) {
+      retries++;
+      if (retries === maxRetries) throw error;
+      console.log(`Retry ${retries}/${maxRetries} after error:`, error.message);
+      await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
+    }
+  }
+}
+ 
 /**
  * Executes chained AI calls sequentially (Multi-Step AI Workflow).
  */
 async function generateMultiStepPlan(ai, projectDetails) {
   const { projectName, description, experience, technology, deadline } = projectDetails;
+  
   // STEP 1: Analyze Project Scope & Complexity
   console.log('Step 1/3: Analyzing project scope & complexity...');
-  const step1Response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
-    contents: `Project Name: ${projectName}\nDescription: ${description}\nTech Stack: ${technology}\nDeadline: ${deadline} days`,
-    config: {
+  const step1Response = await callAIWithRetry(
+    ai,
+    'gemini-3.6-flash',
+    `Project Name: ${projectName}\nDescription: ${description}\nTech Stack: ${technology}\nDeadline: ${deadline} days`,
+    {
       systemInstruction: ANALYSIS_SYSTEM_PROMPT,
       responseMimeType: 'application/json',
-    },
-  });
+    }
+  );
   const step1Data = JSON.parse(step1Response.text);
+ 
+  const adjustedDeadline = !step1Data.deadlineFeasible ? step1Data.suggestedDays : deadline;
+  if (!step1Data.deadlineFeasible) {
+    console.warn(`Deadline unrealistic (${deadline} days). Using suggested ${step1Data.suggestedDays} days`);
+  }
+  
   // STEP 2: Generate Development Phases, Tasks & Timelines
   console.log('Step 2/3: Generating development phases & tasks...');
-  const step2Response = await ai.models.generateContent({
-    model:'gemini-3.6-flash',
-    contents: `Overview: ${step1Data.projectOverview}\nComplexity: ${step1Data.complexity}\nDeveloper Experience: ${experience}\nTech Stack: ${technology}\nTarget Deadline: ${deadline} days`,
-    config: {
+  const step2Response = await callAIWithRetry(
+    ai,
+    'gemini-3.6-flash',
+    `Overview: ${step1Data.projectOverview}\nComplexity: ${step1Data.complexity}\nDeveloper Experience: ${experience}\nTech Stack: ${technology}\nTarget Deadline: ${adjustedDeadline} days`,
+    {
       systemInstruction: PHASES_SYSTEM_PROMPT,
       responseMimeType: 'application/json',
-    },
-  });
+    }
+  );
   const step2Data = JSON.parse(step2Response.text);
+  
   // STEP 3: Identify Risks & Testing Checklist
   console.log('Step 3/3: Identifying risks & testing checklist...');
-  const step3Response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
-    contents: `Project Overview: ${step1Data.projectOverview}\nPhases: ${JSON.stringify(step2Data.phases)}`,
-    config: {
+  const step3Response = await callAIWithRetry(
+    ai,
+    'gemini-3.6-flash',
+    `Project Overview: ${step1Data.projectOverview}\nPhases: ${JSON.stringify(step2Data.phases)}`,
+    {
       systemInstruction: RISKS_TESTING_SYSTEM_PROMPT,
       responseMimeType: 'application/json',
-    },
-  });
+    }
+  );
   const step3Data = JSON.parse(step3Response.text);
+  
   // MERGE ALL STEPS INTO FINAL PLAN OBJECT
   const finalPlan = {
     projectOverview: step1Data.projectOverview,
@@ -176,16 +207,22 @@ async function generateMultiStepPlan(ai, projectDetails) {
     risks: step3Data.risks,
     testingPlan: step3Data.testingPlan,
   };
+ 
+  // Only add deadline warning fields if deadline is infeasible
+  if (!step1Data.deadlineFeasible) {
+    finalPlan.userRequestedDeadline = deadline;
+    finalPlan.aiSuggestedDeadline = step1Data.suggestedDays;
+    finalPlan.deadlineWarning = `Your deadline of ${deadline} days may be unrealistic. AI suggests ${step1Data.suggestedDays} days.`;
+  }
+ 
   return finalPlan;
 }
-
-
-
-
-
-
+ 
+ 
+ 
+ 
+ 
 module.exports = {
-
   validateProjectPlan,
   generateMultiStepPlan
 };

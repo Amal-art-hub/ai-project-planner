@@ -273,6 +273,17 @@ const handleAskAssistant = async () => {
       </span>
     </div>
 
+
+
+    {/* ADD THE WARNING HERE */}
+{plan.deadlineWarning && (
+  <div style={{ backgroundColor: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+    <p style={{ color: '#92400e', fontSize: '13px', margin: 0 }}>
+      ⚠️ {plan.deadlineWarning}
+    </p>
+  </div>
+)}
+
     {/* Phases */}
     <h3 style={{ color: '#818cf8', fontSize: '14px', marginBottom: '10px' }}>🚀 DEVELOPMENT PHASES</h3>
     {plan.phases.map((phase, i) => (

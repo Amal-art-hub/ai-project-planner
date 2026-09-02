@@ -778,3 +778,40 @@ Users are expected to review and modify AI suggestions
 The AI provides starting points, not definitive answers
 I focused on structural validation (JSON schema, required fields) which is more appropriate for this use case
 For critical applications (medical, financial, legal), hallucination detection would be essential, but for creative planning, human judgment is the primary safeguard"
+
+//======================================================
+
+
+Interview — Question 1
+
+Imagine you have demonstrated your application to me. I look at your promptService.js and see that you're getting project plans from Gemini.
+
+Interviewer:
+
+"Your application depends on an LLM to generate the project plan. What happens if Gemini gives you an incorrect or made-up response — for example, it recommends a technology 
+that doesn't actually exist or gives an unrealistic development plan? This is called hallucination. How would you handle hallucinations in your application, especially in a 
+production environment?"
+
+//===============
+
+"LLM hallucination means the model can generate information that sounds correct but is actually false or unrealistic. In my application, I handle this using multiple approaches.
+
+First, I validate the AI output before using it. For example, in my project I have a validateProjectPlan() function that checks whether the generated response has the expected structure, required fields, and correct data types.
+
+Second, I use structured JSON output and clear system instructions to constrain the model's response and make it more predictable.
+
+Third, for production, I could add additional validation rules or external tools when factual verification is important. For example, if the AI recommends a technology, an 
+external knowledge source could verify whether that technology actually exists or is supported.
+
+Finally, I would use a fallback strategy. If the AI response fails validation or cannot be trusted, I would not directly show it to the user. I could return an error, retry 
+the request with stricter instructions, or provide a safe default response.
+
+Because my application generates project plans, there can be multiple valid approaches, so I don't try to validate whether there is one 'correct' plan. Instead, I validate the 
+structure, constraints, feasibility, and important factual information before using the output."
+
+
+
+//=======
+"I'm already doing output validation. After my three-step Gemini workflow produces the final plan, I pass it through validateProjectPlan(). It checks that the response is an 
+object, that projectOverview and complexity are strings, and that phases is a non-empty array. If the validation fails, my backend doesn't send that malformed plan to the 
+frontend; it returns an error instead.
