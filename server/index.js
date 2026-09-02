@@ -9,11 +9,39 @@ const { validateProjectPlan, generateMultiStepPlan} = require('./services/prompt
 
 const app = express();
 const PORT = 5000;
+const rateLimit = require('express-rate-limit');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 app.use(cors());
 app.use(express.json());
+
+
+
+// Rate limiting for project plan generation (5 per day = 15 AI calls max)
+const planLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 5,
+  message: 'Daily plan generation limit reached. Try again tomorrow.'
+});
+
+// Rate limiting for AI assistant (5 per day = 5 AI calls max)
+const assistantLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 5,
+  message: 'Daily assistant limit reached. Try again tomorrow.'
+});
+
+
+
+// ADD THESE TWO LINES RIGHT HERE:
+app.use('/api/project/plan', planLimiter);
+app.use('/api/project/assistant', assistantLimiter);
+
+
+
+
+
 
 app.get('/', (req, res) => {
   res.send('AI Project Planner API is running!');
